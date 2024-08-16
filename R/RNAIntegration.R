@@ -45,6 +45,7 @@
 #' @param scaleTo Each column in the integrated RNA matrix will be normalized to a column sum designated by `scaleTo` prior to adding to Arrow files.
 #' @param genesUse If desired a character vector of gene names to use for integration instead of determined ones from Seurat::variableGenes.
 #' @param nameCell A column name to add to `cellColData` for the predicted scRNA-seq cell in the specified `ArchRProject`. This is useful for identifying which cell was closest to the scATAC-seq cell.
+#' @param transferCell A boolean value indicating whether to predict the scRNA-seq cell.
 #' @param nameGroup A column name to add to `cellColData` for the predicted scRNA-seq group in the specified `ArchRProject`. See `groupRNA` for more details.
 #' @param nameScore A column name to add to `cellColData` for the predicted scRNA-seq score in the specified `ArchRProject`. These scores represent
 #' the assignment accuracy of the group in the RNA cells. Lower scores represent ambiguous predictions and higher scores represent precise predictions. 
@@ -80,6 +81,7 @@ addGeneIntegrationMatrix <- function(
   scaleTo = 10000,
   genesUse = NULL,
   nameCell = "predictedCell",
+  transferCell = TRUE,
   nameGroup = "predictedGroup",
   nameScore = "predictedScore",
   transferParams = list(),
@@ -114,6 +116,7 @@ addGeneIntegrationMatrix <- function(
   .validInput(input = scaleTo, name = "scaleTo", valid = c("numeric"))
   .validInput(input = genesUse, name = "genesUse", valid = c("character", "null"))
   .validInput(input = nameCell, name = "nameCell", valid = c("character"))
+  .validInput(input = transferCell, name = "transferCell", valid = c("boolean"))
   .validInput(input = nameGroup, name = "nameGroup", valid = c("character"))
   .validInput(input = nameScore, name = "nameScore", valid = c("character"))
   .validInput(input = transferParams, name = "transferParams", valid = c("list"))
@@ -485,9 +488,13 @@ addGeneIntegrationMatrix <- function(
     rnaLabels <- do.call(Seurat::TransferData, transferParams)
 
     #RNA Names
-    .logDiffTime(sprintf("%s Seurat TransferData Cell Names Labels", prefix), tstart, verbose = verbose, logFile = logFile)
-    transferParams$refdata <- colnames(subRNA)
-    rnaLabels2 <- do.call(Seurat::TransferData, transferParams)[,1]
+    if (transferCell) {
+      .logDiffTime(sprintf("%s Seurat TransferData Cell Names Labels", prefix), tstart, verbose = verbose, logFile = logFile)
+      transferParams$refdata <- colnames(subRNA)
+      rnaLabels2 <- do.call(Seurat::TransferData, transferParams)[,1]
+    } else {
+      rnaLabels2 <- NULL
+    }
 
     if(addToArrow){
       .logDiffTime(sprintf("%s Seurat TransferData GeneMatrix", prefix), tstart, verbose = verbose, logFile = logFile)
@@ -756,12 +763,13 @@ addGeneIntegrationMatrix <- function(
         file = ArrowFiles[sample], 
         name = paste0(matrixName, "/Info/predictedGroup")
       )
-
-      o <- h5write(
-        obj = dfAll[colnames(sampleMat), "predictedCell"], 
-        file = ArrowFiles[sample], 
-        name = paste0(matrixName, "/Info/predictedCell")
-      )
+      if (transferCell) {
+        o <- h5write(
+          obj = dfAll[colnames(sampleMat), "predictedCell"], 
+          file = ArrowFiles[sample], 
+          name = paste0(matrixName, "/Info/predictedCell")
+        )
+      }
 
       .logDiffTime(sprintf("%s Adding GeneIntegrationMatrix to ArrowFile!", prefix), tstart, verbose = verbose, logFile = logFile)
 
@@ -806,13 +814,15 @@ addGeneIntegrationMatrix <- function(
 
   .logDiffTime("Completed Integration with RNA Matrix", tstart, verbose = verbose, logFile = logFile)
 
-  ArchRProj <- addCellColData(
-    ArchRProj = ArchRProj, 
-    cells = dfAll$cellNames, 
-    data = dfAll$predictedCell,
-    name = nameCell,
-    force = TRUE
-  )
+  if (transferCell) {
+    ArchRProj <- addCellColData(
+      ArchRProj = ArchRProj, 
+      cells = dfAll$cellNames, 
+      data = dfAll$predictedCell,
+      name = nameCell,
+      force = TRUE
+    )
+  }
 
   ArchRProj <- addCellColData(
     ArchRProj = ArchRProj, 
