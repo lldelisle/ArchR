@@ -492,8 +492,6 @@ addGeneIntegrationMatrix <- function(
       .logDiffTime(sprintf("%s Seurat TransferData Cell Names Labels", prefix), tstart, verbose = verbose, logFile = logFile)
       transferParams$refdata <- colnames(subRNA)
       rnaLabels2 <- do.call(Seurat::TransferData, transferParams)[,1]
-    } else {
-      rnaLabels2 <- NULL
     }
 
     if(addToArrow){
@@ -505,12 +503,20 @@ addGeneIntegrationMatrix <- function(
     }
 
     #Match results
-    matchDF <- DataFrame(
-      cellNames = colnames(seuratATAC), 
-      predictionScore = rnaLabels$prediction.score.max,
-      predictedGroup = rnaLabels$predicted.id,
-      predictedCell = rnaLabels2
-    )
+    if (transferCell) {
+      matchDF <- DataFrame(
+        cellNames = colnames(seuratATAC), 
+        predictionScore = rnaLabels$prediction.score.max,
+        predictedGroup = rnaLabels$predicted.id,
+        predictedCell = rnaLabels2
+      )
+    } else {
+      matchDF <- DataFrame(
+        cellNames = colnames(seuratATAC), 
+        predictionScore = rnaLabels$prediction.score.max,
+        predictedGroup = rnaLabels$predicted.id
+      )
+    }
     rownames(matchDF) <- matchDF$cellNames
 
     .logDiffTime(sprintf("%s Saving TransferAnchors Joint CCA", prefix), tstart, verbose = verbose, logFile = logFile)
