@@ -511,6 +511,9 @@ addGeneIntegrationMatrix <- function(
         predictedCell = rnaLabels2
       )
     } else {
+      print("DEBUG")
+      print(ncol(seuratATAC))
+      print(nrow(rnaLabels2))
       matchDF <- DataFrame(
         cellNames = colnames(seuratATAC), 
         predictionScore = rnaLabels$prediction.score.max,
